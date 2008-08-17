@@ -1,4 +1,4 @@
-= Dynamic Text
+= Dynamically Tags
 v1
 
 This allows your models to dynamically insert references to other objects on the fly based on the content of a larger text field.
