@@ -1,0 +1,147 @@
+= Dynamic Text
+v1
+
+This allows your models to dynamically insert references to other objects on the fly based on the content of a larger text field.
+
+Let's say you have a web site that allows people to keep track of their favorite pizza toppings (a pretty lame site, but whatever) and people can post their thoughts and comments.  (e.g. "Dude, olives are totally gross.")
+
+	class User < ActiveRecord::Base  
+		# User fields: firstname, lastname
+		has_many :posts
+  end
+
+	class Topping < ActiveRecord::Base
+		# Topping fields: name, description
+	end
+	
+	class Post < ActiveRecord::Base
+		# Post fields: content, user_id
+		belongs_to :user
+	end
+	
+OK, now our example's all set up.  If the above doesn't make sense, turn around now.
+
+
+BASIC EXAMPLE: Every time someone mentions the name of a pizza topping in a post, we want to have that topping roll-over with an image.
+
+	class Post < ActiveRecord::Base
+		belongs_to :user
+		
+		dynamically_tags [:content], :includes => {:toppings => [:name]}, :scope => :all
+		
+	end
+	
+	> Topping.create(:name => 'olives')
+	=> #<Topping id: 1, name: "olives">
+
+	> p = Post.new(:content => 'I think olives are really gross!')
+	=> #<Post id: nil, user_id: nil, content: "I think {{Topping1}} are really gross!">
+	
+	>> p.content
+	=> "I think olives are really gross!"
+	
+	>> p.content(true) # pass true to the accessor method to get the raw, tagged string
+	=> "I think {{Topping3}} are really gross!"
+	
+
+
+
+ANOTHER EXAMPLE: Tag places where the content includes a firstname followed by a lastname, as well as toppings
+
+	class Post < ActiveRecord::Base
+		belongs_to :user
+
+		dynamically_tags [:content], :includes => {:users => ['firstname lastname'], :toppings => [:name]}, :scope => :all
+		# Note that this currently only works with space-separated strings, as above
+	end
+	
+	class User < ActiveRecord::Base  
+		# User fields: firstname, lastname
+		has_many :posts
+		
+		def name # We need this so dynamically_tags knows what to sub-in for tag
+			self.firstname + " " + self.lastname
+		end
+  end
+
+	>> User.create(:firstname => 'Jason', :lastname => 'Crystal')
+	=> #<User id: 1, firstname: "Jason", lastname: "Crystal">
+
+	>> Topping.create(:name => 'olives')
+	=> #<Topping id: 1, name: "olives">
+	
+	>> p = Post.new(:content => "I strongly disagree with Jason Crystal.  I think olives are delicious!.")
+	=> #<Post id: nil, user_id: nil, content: "I strongly disagree with {{User1}}.  I think {{Topp...">
+	
+	>> p.content
+	=> "I strongly disagree with Jason Crystal.  I think olives are delicious!."
+	
+	>> p.content(true)
+	=> "I strongly disagree with {{User1}}.  I think {{Topping1}} are delicious!."
+	
+	>> p.get_tagged_objects
+	=> [#<User id: 1, firstname: "Jason", lastname: "Crystal">, #<Topping id: 3, name: "olives">]
+	
+	>> p.get_tagged_objects(Topping) # get all tagged toppings
+	=> [#<Topping id: 3, name: "olives"]
+	
+	
+Note that if Jason Crystal suddenly decides he wants to change his name to Jeezy Chreezy, the {{User1}} tag will STILL properly point to the correct object!
+
+
+
+
+YET ANOTHER EXAMPLE: Look for firstname lastname combinations, but only for Post's social_circle.
+
+	class Post < ActiveRecord::Base
+		# Post fields: content, social_circle_id, user_id
+
+		belongs_to :user
+		belongs_to :social_circle
+
+		dynamically_tags [:content], :includes => {:users => ['firstname lastname']}, :scope => :social_circle
+	end
+	
+	class User < ActiveRecord::Base  
+		# User fields: firstname, lastname
+
+		has_many :posts
+		belongs_to :social_circle
+
+		def name
+			self.firstname + " " + self.lastname
+		end
+
+	end
+	
+	class SocialCircle < ActiveRecord::Base	
+		has_many :posts
+		has_many :users
+	end
+	
+	>> good_circle = SocialCircle.create(:name => "Jason's Friends")
+	=> #<SocialCircle id: 1, name: "Jason's Friends">
+	>> bad_circle = SocialCircle.create(:name => "Jason's Enemies")
+	=> #<SocialCircle id: 2, name: "Jason's Enemies">
+	
+	>> User.create(:social_circle => good_circle, :firstname => 'Jason', :lastname => 'Crystal')
+	=> #<User id: 2, firstname: "Jason", lastname: "Crystal", social_circle_id: 1>	
+	>> User.create(:social_circle => bad_circle, :firstname => "Evil", :lastname => "Villain")
+	=> #<User id: 3, firstname: "Evil", lastname: "Villain", social_circle_id: 2>
+	
+	>> p = Post.new(:social_circle => good_circle, :content => 'I agree with Jason Crystal!')
+	=> #<Post id: nil, user_id: nil, content: "I agree with {{User2}}!", social_circle_id: 1>
+	>> p = Post.new(:social_circle => bad_circle, :content => 'I agree with Jason Crystal!')
+	=> #<Post id: nil, user_id: nil, content: "I agree with Jason Crystal!", social_circle_id: 2>
+	
+	Since Jason Crystal is not in bad_circle, it was not tagged out because of the :scope paramter.
+	
+	
+ 
+This is a work in progress.
+
+Please contact:
+Jason Crystal
+jcrystal<at>gmail.com
+http://blog.jasoncrystal.com/
+
