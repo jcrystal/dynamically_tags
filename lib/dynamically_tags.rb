@@ -65,32 +65,36 @@ module DynamicallyTags
 		        word = words[index]
 		
 						includes.each { |class_plural, fields|
-							dynamic_text_scope = scope == :all ? eval(class_plural.to_s.singularize.capitalize) : eval('self.'+scope.to_s+'.'+class_plural.to_s)
-							fields.each { |field|
-								if field.class == Symbol
-									match = dynamic_text_scope.find(:all, :conditions => [field.to_s+' = ?', word]) rescue []
-									if match.size > 0
-										word = '{{'+class_plural.to_s.singularize.capitalize+match[0].id.to_s+'}}'
-									end
-								elsif field.class == String
-									attributes = field.split(' ') # ex ['firstname','lastname']
-									attr_index = 0
-									matches = []
-									while (attr_index < attributes.size && (attr_index == 0 || matches.size > 0))
-										if attr_index == 0
-											matches = dynamic_text_scope.find(:all, :conditions => [attributes[attr_index]+' = ?',word]) rescue []
-										else
-											matches = matches.find_all{|item| eval('item.'+attributes[attr_index]) == words[index+2*attr_index]} rescue []
+							begin
+								dynamic_text_scope = scope == :all ? eval(class_plural.to_s.singularize.capitalize) : eval('self.'+scope.to_s+'.'+class_plural.to_s)
+								fields.each { |field|
+									if field.class == Symbol
+										match = dynamic_text_scope.find(:all, :conditions => [field.to_s+' = ?', word]) rescue []
+										if match.size > 0
+											word = '{{'+class_plural.to_s.singularize.capitalize+match[0].id.to_s+'}}'
 										end
-										attr_index += 1
-									end
+									elsif field.class == String
+										attributes = field.split(' ') # ex ['firstname','lastname']
+										attr_index = 0
+										matches = []
+										while (attr_index < attributes.size && (attr_index == 0 || matches.size > 0))
+											if attr_index == 0
+												matches = dynamic_text_scope.find(:all, :conditions => [attributes[attr_index]+' = ?',word]) rescue []
+											else
+												matches = matches.find_all{|item| eval('item.'+attributes[attr_index]) == words[index+2*attr_index]} rescue []
+											end
+											attr_index += 1
+										end
 									
-									if matches.size > 0
-										word = '{{'+class_plural.to_s.singularize.capitalize+matches[0].id.to_s+'}}'
-										index += (attr_index-1)*2
+										if matches.size > 0
+											word = '{{'+class_plural.to_s.singularize.capitalize+matches[0].id.to_s+'}}'
+											index += (attr_index-1)*2
+										end
 									end
-								end
-							}
+								}
+							rescue
+								# do nothing.  Do not modify.
+							end
 						}						
 						new_body += word
 						index += 1
