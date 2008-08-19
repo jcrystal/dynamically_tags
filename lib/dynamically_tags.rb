@@ -57,7 +57,7 @@ module DynamicallyTags
 
 			def create_dynamic_store_method(attr_name,scope,includes)
 		    define_method attr_name.to_s+"=" do |input|
-					words = input.split(%r{\b})
+					words = input.split(%r{\b}) rescue []
 					new_body = ""
 
 					index = 0
